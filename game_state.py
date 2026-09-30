@@ -637,7 +637,12 @@ class SnakeGameState:
         if self.invincible_powerup_timer > 0.0 or self.invulnerable_safety_timer > 0.0:
             return False
 
-        if len(self.points) < 8 or self.current_length < DISTANCIA_SEGURA_AUTOCOLISAO * 2:
+        # Proteção essencial: a cobra não pode colidir consigo mesma antes de comer
+        # donuts suficientes para fazer uma volta de 180 graus (mínimo de 2 donuts)
+        if self.stats["donuts_eaten"] < 2 or self.current_length < 230.0:
+            return False
+
+        if len(self.points) < 16 or self.current_length < DISTANCIA_SEGURA_AUTOCOLISAO * 1.5:
             return False
 
         # Percorre o corpo de trás para frente (da cauda em direção à cabeça)
@@ -652,7 +657,7 @@ class SnakeGameState:
                 p2 = self.points[i]
                 # Distância do ponto (hx, hy) ao segmento de reta p1-p2
                 d = self._dist_point_to_segment((hx, hy), p1, p2)
-                if d < 18.0:
+                if d < 14.0:
                     return True
         return False
 

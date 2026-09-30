@@ -486,6 +486,15 @@ class TestSnakeGameLogic(unittest.TestCase):
         self.assertGreater(self.game.points[-1][0], 1000)
         self.assertEqual(len(self.game.points), 7)
 
+    # 23. MÃO PARADA NÃO CAUSA AUTOCOLISÃO PREMATURA
+    def test_stationary_hand_does_not_trigger_premature_death(self):
+        # Simula jogador segurando a mão parada com pequeno tremor natural de webcam
+        for i in range(120):
+            x = 640 + int(math.sin(i * 0.4) * 6)
+            y = 360 + int(math.cos(i * 0.4) * 6)
+            st = self.game.update((x, y), dt=0.033)
+            self.assertEqual(st, GameStateEnum.PLAYING, f"Jogador morreu prematuramente no frame {i}!")
+
 
 if __name__ == "__main__":
     unittest.main()

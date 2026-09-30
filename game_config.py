@@ -109,7 +109,7 @@ TEMPO_OCIOSO_ATTRACT = 3.5 # segundos sem mão antes de entrar em modo apresenta
 # =============================================================================
 COMPRIMENTO_INICIAL = 160
 CRESCIMENTO_DONUT = 35
-DISTANCIA_SEGURA_AUTOCOLISAO = 26.0 # distância física segura em pixels
+DISTANCIA_SEGURA_AUTOCOLISAO = 140.0 # distância física segura ao longo da espinha (evita colisão no próprio pescoço)
 VELOCIDADE_GHOST_BASE = 160.0 # pixels por segundo (independente de FPS)
 
 # =============================================================================
