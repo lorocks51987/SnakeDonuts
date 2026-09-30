@@ -25,6 +25,10 @@ from game_config import (
     MARGEM_SPAWN_Y_TOP,
     MARGEM_SPAWN_Y_BOTTOM,
     SCORE_DONUT,
+    SCORE_GOLDEN_DONUT,
+    SCORE_PHASE_COMPLETE,
+    SCORE_SURVIVE_PURSUIT,
+    SCORE_JACKPOT,
     SCORE_APPLE,
     SCORE_POTION,
     SCORE_COIN,
@@ -43,6 +47,7 @@ from game_config import (
     DURACAO_HEART,
     DURACAO_CUBE,
     DURACAO_GHOST,
+    DURACAO_TRANSICAO_FASE,
     INVULNERABILIDADE_POS_ESCUDO,
     INVULNERABILIDADE_SEGUNDA_CHANCE,
     DURACAO_BANNER_LEVEL_UP,
@@ -544,9 +549,11 @@ class SnakeGameState:
     # -------------------------------------------------------------------------
     def apply_surprise_cube(self, pos: Tuple[int, int]):
         """Sorteia e aplica um efeito de acordo com a fase."""
-        if self.level == 4 and self.phase_cubes_collected == 0:
+        self.phase_cubes_collected += 1
+
+        if self.level == 4 and self.phase_cubes_collected == 1:
             chosen = random.choice([CubeEffect.GOLDEN_SHIELD, CubeEffect.BONUS_POINTS, CubeEffect.INVINCIBILITY])
-        elif self.level == 4 and self.phase_cubes_collected == 1:
+        elif self.level == 4 and self.phase_cubes_collected >= 2:
             chosen = random.choice([CubeEffect.FREEZE_COMBO, CubeEffect.TIGHT_COMBO, CubeEffect.BONUS_POINTS])
         elif self.first_cube_in_game:
             chosen = CubeEffect.GOLDEN_SHIELD
@@ -784,6 +791,31 @@ class SnakeGameState:
         if self.state != GameStateEnum.PLAYING:
             return self.state
 
+        # ---------------------------------------------------------------------
+        # TRANSIÇÃO ENTRE FASES (PAUSA PERIGOS E AVANÇA NÍVEL APÓS O TIMER)
+        # ---------------------------------------------------------------------
+        if self.in_level_transition:
+            self.transition_timer -= dt
+            if raw_head is not None and self.smooth_head is not None and self.points:
+                rx, ry = raw_head
+                px, py = self.points[-1]
+                alpha = 1.0 - math.exp(-dt / 0.045)
+                self.smooth_head[0] += (rx - self.smooth_head[0]) * alpha
+                self.smooth_head[1] += (ry - self.smooth_head[1]) * alpha
+                cx, cy = int(round(self.smooth_head[0])), int(round(self.smooth_head[1]))
+                if math.hypot(cx - px, cy - py) > 3.0:
+                    self.points.append([cx, cy])
+                    self.lengths.append(math.hypot(cx - px, cy - py))
+                    self.current_length += math.hypot(cx - px, cy - py)
+            while self.current_length > self.allowed_length and len(self.lengths) > 1 and len(self.points) > 1:
+                self.current_length = max(0.0, self.current_length - self.lengths.pop(1))
+                self.points.pop(0)
+
+            if self.transition_timer <= 0.0:
+                self.in_level_transition = False
+                self.setup_level_state(self.level + 1)
+            return self.state
+
         # Atualiza tempo de sobrevivência
         self.stats["survival_time"] += dt
 
@@ -810,6 +842,62 @@ class SnakeGameState:
                 if self.combo_time_remaining <= 0.0:
                     self.combo_count = 0
                     self.combo_multiplier = 1
+
+        # ---------------------------------------------------------------------
+        # REGRAS E TIMERS DAS FASES 2, 3, 4 E 5
+        # ---------------------------------------------------------------------
+        if self.level == 2:
+            # Fase 2: Ao atingir combo x3, gera o Donut Dourado
+            if (self.combo_multiplier >= 3 or self.combo_count >= 3) and not self.phase_event_flag1:
+                self.phase_event_flag1 = True
+                self.is_golden_donut = True
+                self.golden_donut_timer = 999.0
+                self.floating_texts.append(
+                    FloatingText("DONUT DOURADO SURGIU!", self.largura // 2 - 140, self.altura // 2 - 50, COLOR_GOLDEN_GLOW, 1.4, 1.5)
+                )
+
+        elif self.level == 3:
+            # Fase 3: Contagem regressiva de 15s
+            self.phase_timer -= dt
+            if self.phase_timer <= 10.0 and not self.phase_event_flag1:
+                self.phase_event_flag1 = True
+                self._spawn_forced_special_item("apple")
+
+            if self.ghost_respawn_timer > 0.0:
+                self.ghost_respawn_timer -= dt
+                if self.ghost_respawn_timer <= 0.0 and self.phase_timer > 2.0:
+                    self.spawn_ghost()
+
+            if self.phase_timer <= 0.0:
+                self.score += SCORE_SURVIVE_PURSUIT
+                self.phase_score += SCORE_SURVIVE_PURSUIT
+                self.ghost_active = False
+                self.complete_current_phase()
+                return self.state
+
+        elif self.level == 4:
+            # Fase 4: Libera Poção se cobra estiver longa
+            if self.allowed_length > 220 and self.special_item_type is None and not self.phase_event_flag2:
+                self.phase_event_flag2 = True
+                self._spawn_forced_special_item("potion")
+
+        elif self.level == 5:
+            # Fase 5: Contagem regressiva de 20s + Investidas a cada 3s
+            self.phase_timer = max(0.0, self.phase_timer - dt)
+            self.ghost_charge_timer += dt
+            if self.ghost_charge_timer >= 3.0:
+                self.ghost_charge_timer = 0.0
+                self.ghost_speed_boost_timer = 0.8
+                self.floating_texts.append(
+                    FloatingText("INVESTIDA!", self.largura // 2 - 70, self.altura // 2 - 40, COLOR_GHOST_CRIMSON, 1.2, 1.0)
+                )
+
+            if self.phase_timer <= 0.0 and self.phase_score >= 600:
+                self.score += SCORE_JACKPOT
+                self.phase_score += SCORE_JACKPOT
+                self.ghost_active = False
+                self.complete_current_phase()
+                return self.state
 
         # ---------------------------------------------------------------------
         # MOVIMENTAÇÃO DA CABEÇA E RASTRO DA COBRA
@@ -874,10 +962,18 @@ class SnakeGameState:
         fx, fy = self.food_pos
         if math.hypot(cx - fx, cy - fy) < 48.0:
             if self.is_golden_donut:
-                self.register_eat(300, "DONUT DOURADO!", (fx, fy), COLOR_GOLDEN_GLOW)
+                self.register_eat(SCORE_GOLDEN_DONUT, "DONUT DOURADO!", (fx, fy), COLOR_GOLDEN_GLOW)
                 self.is_golden_donut = False
+                if self.level == 2:
+                    self.complete_current_phase()
+                    return self.state
             else:
                 self.register_eat(SCORE_DONUT, "DONUT", (fx, fy), COLOR_SYNTH_PINK)
+                if self.level == 1:
+                    self.phase_donuts += 1
+                    if self.phase_donuts >= 5 and not self.phase_event_flag1:
+                        self.phase_event_flag1 = True
+                        self._spawn_forced_special_item("ring")
             self.allowed_length += CRESCIMENTO_DONUT
             self.stats["donuts_eaten"] += 1
             self.spawn_food()
@@ -906,27 +1002,31 @@ class SnakeGameState:
                 elif item == "coin":
                     self.register_eat(SCORE_COIN, "SUPER MOEDA!", (ix, iy), COLOR_GOLDEN_GLOW)
                     self.stats["special_items_collected"] += 1
-                    self.spawn_ghost()
+                    if not self.ghost_active:
+                        self.spawn_ghost()
                     audio.play("coin")
                 elif item == "ring":
-                    if self.has_shield:
-                        # Segundo anel coletado concede pontos extras sem acumular escudo
-                        self.register_eat(SCORE_RING * 2, "ANEL BÔNUS!", (ix, iy), COLOR_GOLDEN_GLOW)
-                    else:
-                        self.has_shield = True
-                        self.register_eat(SCORE_RING, "ANEL DOURADO!", (ix, iy), COLOR_GOLDEN_GLOW)
+                    self.has_shield = True
+                    self.register_eat(SCORE_RING, "ANEL DOURADO!", (ix, iy), COLOR_GOLDEN_GLOW)
                     self.stats["special_items_collected"] += 1
                     audio.play("ring")
+                    if self.level == 1:
+                        self.complete_current_phase()
+                        return self.state
                 elif item == "heart":
-                    if self.has_extra_life:
-                        self.register_eat(SCORE_HEART * 2, "VIDA BÔNUS!", (ix, iy), COLOR_GHOST_CRIMSON)
-                    else:
-                        self.has_extra_life = True
-                        self.register_eat(SCORE_HEART, "CORACAO PIXEL!", (ix, iy), COLOR_GHOST_CRIMSON)
+                    self.has_extra_life = True
+                    self.register_eat(SCORE_HEART, "CORACAO PIXEL!", (ix, iy), COLOR_GHOST_CRIMSON)
                     self.stats["special_items_collected"] += 1
                     audio.play("heart")
                 elif item == "cube":
                     self.apply_surprise_cube((ix, iy))
+                    if self.level == 4:
+                        if self.phase_cubes_collected == 1 and not self.phase_event_flag1:
+                            self.phase_event_flag1 = True
+                            self._spawn_forced_special_item("cube")
+                        elif self.phase_cubes_collected >= 2:
+                            self.complete_current_phase()
+                            return self.state
 
         # ---------------------------------------------------------------------
         # FANTASMA (MOVIMENTO POR dt E COLISÃO)

@@ -109,8 +109,8 @@ class SnakeGameRenderer:
         self.sprite_coin = self._load_sprite("coin.png", 82, fallback_color=(0, 215, 255))
 
         # Power-ups Oficiais
-        # 1. Anel do Sonic (GIF Animado de 4 frames)
-        self.sonic_ring_frames = self._load_gif_frames("AnelSonic.gif", (84, 84))
+        # 1. Anel do Sonic (GIF Animado de 4 frames, tamanho compacto 56x56)
+        self.sonic_ring_frames = self._load_gif_frames("AnelSonic.gif", (56, 56))
         self.sonic_ring_frame_idx = 0
         self.last_ring_anim_time = 0.0
         self.sprite_ring = self.sonic_ring_frames[1] if len(self.sonic_ring_frames) > 1 else self.sonic_ring_frames[0]
@@ -395,18 +395,12 @@ class SnakeGameRenderer:
             rc = cv2.resize(self.sprite_coin, (cw, ch))
             safe_overlay_png(img, rc, (ix - cw // 2, iy - ch // 2))
         elif item == "ring":
-            # Animação de rotação 3D do Anel do Sonic (avança frame a cada 90ms)
+            # Animação de rotação do Anel do Sonic leve e fluida (56x56)
             if now - self.last_ring_anim_time > 0.09 and len(self.sonic_ring_frames) > 0:
                 self.sonic_ring_frame_idx = (self.sonic_ring_frame_idx + 1) % len(self.sonic_ring_frames)
                 self.last_ring_anim_time = now
             curr_frame = self.sonic_ring_frames[self.sonic_ring_frame_idx]
-            scale = 1.0 + 0.05 * math.sin(now * 6)
-            if abs(scale - 1.0) > 0.02:
-                rw, rh = int(curr_frame.shape[1] * scale), int(curr_frame.shape[0] * scale)
-                rf = cv2.resize(curr_frame, (rw, rh))
-            else:
-                rf = curr_frame
-            safe_overlay_png(img, rf, (ix - rf.shape[1] // 2, iy - rf.shape[0] // 2))
+            safe_overlay_png(img, curr_frame, (ix - curr_frame.shape[1] // 2, iy - curr_frame.shape[0] // 2))
         elif item == "heart":
             # Batimento cardíaco pulsante para o Coração de Segunda Chance Raro
             scale = 1.0 + 0.12 * abs(math.sin(now * 5))
@@ -453,14 +447,14 @@ class SnakeGameRenderer:
                 img, (bx, by), (bx + bw, by + bh),
                 cor_fundo=(8, 12, 24), cor_borda=COLOR_CYBER_GREEN, raio=18, alpha=0.96, espessura_borda=3
             )
-            cv2.putText(img, "★ FASE CONCLUÍDA! ★", (bx + 40, by + 42), cv2.FONT_HERSHEY_DUPLEX, 1.0, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA)
+            cv2.putText(img, "FASE CONCLUIDA!", (bx + 40, by + 42), cv2.FONT_HERSHEY_DUPLEX, 1.0, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA)
 
             phase_pts = game.transition_data.get("phase_score", 0)
             cv2.putText(img, f"Pontos Conquistados: +{phase_pts}", (bx + 40, by + 82), cv2.FONT_HERSHEY_DUPLEX, 0.68, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
 
-            next_t = game.transition_data.get("next_title", "PRÓXIMA FASE")
+            next_t = game.transition_data.get("next_title", "PROXIMA FASE")
             next_obj = game.transition_data.get("next_objective", "")
-            cv2.putText(img, f"Próxima: {next_t}", (bx + 40, by + 124), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_ELECTRIC_CYAN, 2, cv2.LINE_AA)
+            cv2.putText(img, f"Proxima: {next_t}", (bx + 40, by + 124), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_ELECTRIC_CYAN, 2, cv2.LINE_AA)
             cv2.putText(img, f"Objetivo: {next_obj}", (bx + 40, by + 156), cv2.FONT_HERSHEY_DUPLEX, 0.58, COLOR_WHITE, 1, cv2.LINE_AA)
             return
 

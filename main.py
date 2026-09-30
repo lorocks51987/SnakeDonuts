@@ -16,6 +16,15 @@ Arquitetura Modular:
 
 import os
 import sys
+import warnings
+
+# Silencia logs ruidosos do TensorFlow, MediaPipe e Abseil antes das importações
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['GLOG_minloglevel'] = '3'
+os.environ['ABSL_LOGGING_LEVEL'] = '3'
+warnings.filterwarnings('ignore')
+
 import time
 import math
 from typing import Optional

@@ -3,6 +3,11 @@ chcp 65001 > nul
 title SnakeDonuts - ADS Unimar
 color 0B
 
+set TF_CPP_MIN_LOG_LEVEL=3
+set TF_ENABLE_ONEDNN_OPTS=0
+set GLOG_minloglevel=3
+set PYTHONWARNINGS=ignore
+
 echo =====================================================================
 echo                     SNAKEDONUTS - STAND UNIMAR
 echo =====================================================================
