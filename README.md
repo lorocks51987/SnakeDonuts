@@ -27,10 +27,6 @@
 ### 2. Tela de Game Over e Hall da Fama (Top 5 Recordes)
 ![Tela de Game Over Arcade](assets/screenshot_game_over.png)
 
-### 3. Demonstração de Gameplay em Tempo Real
-![Demonstração Arcade Neon](assets/gameplay_demo.gif)
-*(Vídeo completo em alta definição disponível em [assets/gameplay_demo.mp4](assets/gameplay_demo.mp4))*
-
 ---
 
 ## 🎮 SOBRE O PROJETO
