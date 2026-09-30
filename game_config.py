@@ -100,7 +100,7 @@ INVULNERABILIDADE_POS_ESCUDO = 1.0  # 1s após anel salvar
 INVULNERABILIDADE_SEGUNDA_CHANCE = 2.0 # 2s após coração salvar
 
 # Temporizadores de Nível e Telas
-DURACAO_BANNER_LEVEL_UP = 0.85 # segundos para exibição do banner de nível
+DURACAO_BANNER_LEVEL_UP = 2.4 # segundos para exibição do banner de nível central
 TEMPO_TOLERANCIA_PERDA_MAO = 1.2 # segundos de tolerância antes de pausar
 TEMPO_OCIOSO_ATTRACT = 3.5 # segundos sem mão antes de entrar em modo apresentação
 
@@ -119,43 +119,43 @@ VELOCIDADE_GHOST_BASE = 160.0 # pixels por segundo (independente de FPS)
 LEVEL_DEFINITIONS = {
     1: {
         "nome": "AQUECIMENTO",
-        "desc": "Donuts normais. Ritmo acessivel!",
+        "desc": "Donuts e Anel do Sonic (Escudo)! Ritmo acessivel.",
         "min_score": 0,
         "combo_window": 3.0,
         "ghost_speed": 150.0,
-        "unlocked_items": []
+        "unlocked_items": ["ring"]
     },
     2: {
         "nome": "CORRERIA ACUCARADA",
-        "desc": "Maca e Moeda liberadas! Combos em destaque.",
+        "desc": "Caixa do Mario, Maca e Moeda liberadas! Combos a mil.",
         "min_score": 1200,
         "combo_window": 2.8,
         "ghost_speed": 180.0,
-        "unlocked_items": ["apple", "coin"]
+        "unlocked_items": ["ring", "cube", "apple", "coin"]
     },
     3: {
         "nome": "CACA FANTASMA",
-        "desc": "Pocao e Anel Dourado liberados! Fantasmas rondam.",
+        "desc": "Pocao magica liberada! Fantasmas entram na caca.",
         "min_score": 3000,
         "combo_window": 2.6,
         "ghost_speed": 210.0,
-        "unlocked_items": ["apple", "coin", "potion", "ring"]
+        "unlocked_items": ["ring", "cube", "apple", "coin", "potion"]
     },
     4: {
-        "nome": "CAIXA DE SURPRESAS",
-        "desc": "Cubo Surpresa liberado! Janela de combo mais rapida.",
+        "nome": "SEGUNDA CHANCE",
+        "desc": "Coracao Pixel raro liberado! Janela de combo rapida.",
         "min_score": 6000,
         "combo_window": 2.4,
         "ghost_speed": 240.0,
-        "unlocked_items": ["apple", "coin", "potion", "ring", "cube"]
+        "unlocked_items": ["ring", "cube", "apple", "coin", "potion", "heart"]
     },
     5: {
-        "nome": "SEGUNDA CHANCE",
-        "desc": "Coracao Pixel raro liberado! Fantasmas implacaveis.",
+        "nome": "MESTRES DO ARCADE",
+        "desc": "Velocidade maxima! Desafio supremo do stand.",
         "min_score": 10000,
         "combo_window": 2.2,
         "ghost_speed": 270.0,
-        "unlocked_items": ["apple", "coin", "potion", "ring", "cube", "heart"]
+        "unlocked_items": ["ring", "cube", "apple", "coin", "potion", "heart"]
     }
 }
 

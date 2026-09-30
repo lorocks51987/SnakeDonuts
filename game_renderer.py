@@ -382,23 +382,27 @@ class SnakeGameRenderer:
     def _render_banners(self, img: np.ndarray, game: SnakeGameState, now: float):
         cx, cy = self.largura // 2, self.altura // 2
 
-        # 1. Banner de Subida de Nível (Posicionado logo abaixo do HUD para não tapar o jogo)
+        # 1. Banner de Subida de Nível (No centro da tela, destacado e fácil de ler)
         if game.level_up_banner_timer > 0.0:
-            bw, bh = 580, 68
-            bx, by = cx - bw // 2, 74
+            bw, bh = 680, 125
+            bx, by = cx - bw // 2, cy - bh // 2 - 25
             stand_utils.desenhar_retangulo_arredondado(
                 img, (bx, by), (bx + bw, by + bh),
-                cor_fundo=(12, 16, 26), cor_borda=COLOR_CYBER_GREEN, raio=10, alpha=0.92, espessura_borda=2
+                cor_fundo=(10, 14, 26), cor_borda=COLOR_CYBER_GREEN, raio=16, alpha=0.95, espessura_borda=3
             )
             linhas = game.level_up_message.split("\n")
-            cv2.putText(img, linhas[0], (bx + 20, by + 28), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
+            # Cabeçalho arcade em amarelo neon
+            cv2.putText(img, "★ SUBIU DE NIVEL! ★", (bx + 30, by + 34), cv2.FONT_HERSHEY_DUPLEX, 0.60, COLOR_GOLDEN_GLOW, 1, cv2.LINE_AA)
+            # Nome do nível em destaque verde
+            cv2.putText(img, linhas[0], (bx + 30, by + 74), cv2.FONT_HERSHEY_DUPLEX, 0.95, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
+            # Descrição do nível
             if len(linhas) > 1:
-                cv2.putText(img, linhas[1], (bx + 20, by + 54), cv2.FONT_HERSHEY_DUPLEX, 0.48, COLOR_WHITE, 1, cv2.LINE_AA)
+                cv2.putText(img, linhas[1], (bx + 30, by + 106), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_WHITE, 1, cv2.LINE_AA)
 
-        # 2. Anúncio do Efeito do Cubo Surpresa
+        # 2. Anúncio do Efeito do Cubo Surpresa (Abaixo do centro para não colidir)
         if game.cube_announcement_timer > 0.0 and game.active_cube_announcement:
-            bw, bh = 540, 70
-            bx, by = cx - bw // 2, cy + 50
+            bw, bh = 560, 70
+            bx, by = cx - bw // 2, cy + 90
             stand_utils.desenhar_retangulo_arredondado(
                 img, (bx, by), (bx + bw, by + bh),
                 cor_fundo=(15, 12, 24), cor_borda=game.cube_announcement_color, raio=12, alpha=0.92, espessura_borda=2
@@ -511,43 +515,40 @@ class SnakeGameRenderer:
 
         cx = w // 2
 
-        # Card de Instruções Inferior (Preserva a arte do título e mascote no topo e centro)
-        cw, ch = 980, 185
+        # Card de Instruções Inferior com Explicação Completa das Mecânicas
+        cw, ch = 1040, 205
         cx1 = cx - cw // 2
-        cy1 = h - ch - 30
+        cy1 = h - ch - 20
 
         stand_utils.desenhar_retangulo_arredondado(
             canvas, (cx1, cy1), (cx1 + cw, cy1 + ch),
-            cor_fundo=(10, 12, 22), cor_borda=COLOR_ELECTRIC_CYAN, raio=14, alpha=0.92, espessura_borda=2
+            cor_fundo=(10, 12, 22), cor_borda=COLOR_ELECTRIC_CYAN, raio=14, alpha=0.94, espessura_borda=2
         )
 
         blink = int(now * 3) % 2 == 0
         cor_pisca = COLOR_CYBER_GREEN if blink else COLOR_ELECTRIC_CYAN
-        cv2.putText(canvas, "* MOSTRE SUA MAO PARA JOGAR *", (cx - 210, cy1 + 32), cv2.FONT_HERSHEY_DUPLEX, 0.78, cor_pisca, 2, cv2.LINE_AA)
-        cv2.line(canvas, (cx1 + 30, cy1 + 45), (cx1 + cw - 30, cy1 + 45), (45, 55, 75), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "* MOSTRE SUA MAO PARA INICIAR A PARTIDA *", (cx - 265, cy1 + 30), cv2.FONT_HERSHEY_DUPLEX, 0.78, cor_pisca, 2, cv2.LINE_AA)
+        cv2.line(canvas, (cx1 + 25, cy1 + 42), (cx1 + cw - 25, cy1 + 42), (45, 55, 75), 1, cv2.LINE_AA)
 
-        # Alternância automática de páginas de dicas (a cada 3.5s)
-        pagina_dica = int(now / 3.5) % 2
-        if pagina_dica == 0:
-            dicas = [
-                ("1. Aponte o indicador para guiar a cobra e devorar Donuts", COLOR_CYBER_GREEN),
-                ("2. Anel Dourado: Escudo contra colisoes  |  Coracao Pixel: Segunda Chance", COLOR_GOLDEN_GLOW),
-            ]
-        else:
-            dicas = [
-                ("1. Cubo Surpresa sorteia power-ups beneficos ou desafios arcade", COLOR_SYNTH_PINK),
-                ("2. Encadeie coletas rapidas para ativar multiplicadores de combo ate x8!", COLOR_ELECTRIC_CYAN),
-            ]
+        # Mecânicas do Jogo Explicadas de Forma Clara e Direta
+        instrucoes = [
+            ("COMO JOGAR:", "Aponte o indicador na camera para guiar a cobra e devorar Donuts.", COLOR_CYBER_GREEN),
+            ("ANEL DO SONIC:", "Concede Escudo Dourado contra 1 batida (no proprio corpo ou no fantasma).", COLOR_GOLDEN_GLOW),
+            ("CAIXA DO MARIO:", "Cubo Surpresa com super poderes (donut dourado, encurtar corpo, invencivel).", COLOR_ELECTRIC_CYAN),
+            ("COMBOS & PONTOS:", "Coma itens rapidamente em sequencia para multiplicar pontos em ate x8!", COLOR_SYNTH_PINK),
+        ]
 
-        for i, (txt, cor) in enumerate(dicas):
-            cv2.putText(canvas, txt, (cx1 + 40, cy1 + 75 + i * 26), cv2.FONT_HERSHEY_DUPLEX, 0.49, cor, 1, cv2.LINE_AA)
+        for i, (titulo, desc, cor) in enumerate(instrucoes):
+            y_linha = cy1 + 68 + i * 25
+            cv2.putText(canvas, titulo, (cx1 + 30, y_linha), cv2.FONT_HERSHEY_DUPLEX, 0.48, cor, 2, cv2.LINE_AA)
+            cv2.putText(canvas, desc, (cx1 + 210, y_linha), cv2.FONT_HERSHEY_DUPLEX, 0.46, COLOR_WHITE, 1, cv2.LINE_AA)
 
-        cv2.line(canvas, (cx1 + 30, cy1 + 135), (cx1 + cw - 30, cy1 + 135), (45, 55, 75), 1, cv2.LINE_AA)
+        cv2.line(canvas, (cx1 + 25, cy1 + 172), (cx1 + cw - 25, cy1 + 172), (45, 55, 75), 1, cv2.LINE_AA)
 
         # Destaque do Recorde no rodapé do card
         high = game.leaderboard.get_high_score()
         top_name = game.leaderboard.scores[0]["name"] if game.leaderboard.scores else "ADS"
-        cv2.putText(canvas, f"RECORDE DO STAND: {top_name} - {high} PTS   |   ADS UNIMAR ABERTA", (cx - 270, cy1 + 162), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_CYBER_GREEN, 1, cv2.LINE_AA)
+        cv2.putText(canvas, f"RECORDE DO STAND: {top_name} - {high} PTS   |   ADS UNIMAR ABERTA", (cx - 275, cy1 + 193), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_CYBER_GREEN, 1, cv2.LINE_AA)
 
         return canvas
 

@@ -117,8 +117,8 @@ class SpawnManager:
     def __init__(self, largura: int = LARGURA_PADRAO, altura: int = ALTURA_PADRAO):
         self.largura = largura
         self.altura = altura
-        self.next_special_spawn_time = time.monotonic() + 3.0
-        self.min_special_interval = 4.5 # cooldown entre spawns de itens especiais
+        self.next_special_spawn_time = time.monotonic() + 2.0
+        self.min_special_interval = 2.5 # cooldown dinamico entre spawns de itens especiais
 
     def get_safe_position(self, avoid_points: List[Tuple[float, float]], min_dist: float = 120.0) -> Tuple[int, int]:
         """Tenta encontrar uma posição segura longe da cobra, HUD e itens."""
@@ -308,7 +308,7 @@ class SnakeGameState:
         self.player_initials = ["A", "D", "S"]
         self.selected_initial_idx = 0
 
-        self.spawner.next_special_spawn_time = time.monotonic() + 3.0
+        self.spawner.next_special_spawn_time = time.monotonic() + 2.0
         self.spawn_food()
         audio.play("start")
 
@@ -371,20 +371,20 @@ class SnakeGameState:
             self.spawner.next_special_spawn_time = now + 2.0
             return
 
-        # Pesos e probabilidades dos itens disponíveis
+        # Pesos e probabilidades dos itens disponíveis (Alta prioridade para Anel do Sonic e Caixa do Mario)
         pool = []
-        if "apple" in unlocked:
-            pool.extend(["apple"] * 25)
-        if "coin" in unlocked:
-            pool.extend(["coin"] * 25)
-        if "potion" in unlocked:
-            pool.extend(["potion"] * 20)
         if "ring" in unlocked:
-            pool.extend(["ring"] * 18)
+            pool.extend(["ring"] * 32)
         if "cube" in unlocked:
-            pool.extend(["cube"] * 12)
+            pool.extend(["cube"] * 30)
+        if "apple" in unlocked:
+            pool.extend(["apple"] * 16)
+        if "coin" in unlocked:
+            pool.extend(["coin"] * 16)
+        if "potion" in unlocked:
+            pool.extend(["potion"] * 12)
         if "heart" in unlocked:
-            pool.extend(["heart"] * 4) # Raro no nível 5+
+            pool.extend(["heart"] * 8)
 
         if not pool:
             return
@@ -825,6 +825,7 @@ class SnakeGameState:
             self.special_item_timer -= dt
             if self.special_item_timer <= 0.0:
                 self.special_item_type = None
+                self.spawner.next_special_spawn_time = now + 1.8
 
         # ---------------------------------------------------------------------
         # COLISÃO COM DONUT
@@ -849,6 +850,7 @@ class SnakeGameState:
             if math.hypot(cx - ix, cy - iy) < 48.0:
                 item = self.special_item_type
                 self.special_item_type = None
+                self.spawner.next_special_spawn_time = now + self.spawner.min_special_interval
 
                 if item == "apple":
                     self.invincible_powerup_timer = DURACAO_INVENCIBILIDADE
