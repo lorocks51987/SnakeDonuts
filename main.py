@@ -208,15 +208,21 @@ def main():
             # Otimização Crítica de Latência: inferência do MediaPipe em 640x360
             scale_w, scale_h = 640, 360
             img_small = cv2.resize(img, (scale_w, scale_h), interpolation=cv2.INTER_LINEAR)
-            hands, _ = detector.findHands(img_small, draw=False, flipType=False)
+            hand_result = detector.findHands(img_small, draw=False, flipType=False)
+            hands = hand_result[0] if isinstance(hand_result, tuple) else hand_result
 
             raw_head = None
-            if hands:
+            if hands and len(hands) > 0:
                 scale_factor_x = largura_real / scale_w
                 scale_factor_y = altura_real / scale_h
-                lmList = hands[0]['lmList']
-                fingers = detector.fingersUp(hands[0])
-                raw_head = (int(lmList[8][0] * scale_factor_x), int(lmList[8][1] * scale_factor_y))
+                lmList = hands[0].get('lmList', []) if isinstance(hands[0], dict) else []
+                try:
+                    fingers = detector.fingersUp(hands[0])
+                except Exception:
+                    fingers = None
+
+                if len(lmList) > 8:
+                    raw_head = (int(lmList[8][0] * scale_factor_x), int(lmList[8][1] * scale_factor_y))
 
                 # Reconhecimento do gesto de mão fechada (punho cerrado) para reiniciar
                 if fingers is not None:
