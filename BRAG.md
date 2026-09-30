@@ -80,9 +80,23 @@ A base de código foi dividida em 6 subsistemas independentes:
 
 ---
 
-## 📋 3. Observações sobre Validação Presencial e Material Promocional
+## 🎬 3. Pacote Promocional e Material do Stand (Execução do Brag)
 
-1. **Validação em Ambiente Real:**  
-   Embora os 23 testes automatizados garantam o comportamento correto da lógica e renderização headless, a validação presencial com operador humano diante da webcam por 5 a 10 minutos é indispensável para calibrar iluminação, distância de captura e conforto ergonômico no stand.
-2. **Documento Técnico vs. Pacote Promocional:**  
-   Este documento constitui o *Technical Brag Sheet* de engenharia (arquitetura, correções e métricas). A elaboração de materiais audiovisuais completos (vídeos gravados da partida e roteiro de demonstração ao vivo) deve ser realizada imediatamente após o ensaio com a webcam física no local.
+Em complemento ao relatório técnico, foram desenvolvidos e integrados ao repositório todos os componentes audiovisuais e promocionais:
+
+1. **Demonstração em Vídeo e Animação de Gameplay:**
+   - **GIF Animado:** [`assets/gameplay_demo.gif`](assets/gameplay_demo.gif) (incorporado diretamente no `README.md`).
+   - **Vídeo em Alta Resolução:** [`assets/gameplay_demo.mp4`](assets/gameplay_demo.mp4) (gerado via simulação coreografada em 720p @ 25 FPS).
+   - Demonstra a transição fluida do Attract Mode para a partida, coleta de donuts com multiplicação de combo (x1 a x3), absorção de impacto pelo Anel Dourado (Escudo), ativação do Cubo Surpresa, perseguição do fantasma vermelho e devoração sob o efeito da Maçã Encantada.
+
+2. **Roteiro Oficial de Demonstração no Stand:**
+   - Documento completo em [`ROTEIRO_STAND.md`](ROTEIRO_STAND.md): Pitch de entrada de 30 segundos, condução passo a passo do visitante, guia de atalhos do operador e respostas prontas para perguntas técnicas da banca e professores.
+
+3. **Material Promocional e de Divulgação:**
+   - Documento completo em [`MATERIAL_PROMOCIONAL.md`](MATERIAL_PROMOCIONAL.md): Textos oficiais para redes sociais (LinkedIn profissional e Instagram dinâmico), cartaz de regras rápidas para impressão ao lado do stand e notas de lançamento da edição especial de fliperama.
+
+---
+
+## 📋 4. Próxima Etapa Técnica
+
+Embora os 23 testes automatizados garantam o comportamento correto da lógica e a demonstração em vídeo valide o renderizador gráfico, o ensaio presencial de 5 a 10 minutos com o operador humano em frente à webcam do stand é recomendado para calibrar a iluminação do local e a altura ideal do tripé da câmera.
