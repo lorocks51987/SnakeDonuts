@@ -1,0 +1,27 @@
+[
+  {
+    "name": "ADS",
+    "score": 350,
+    "date": "Recorde"
+  },
+  {
+    "name": "UNI",
+    "score": 240,
+    "date": "Stand"
+  },
+  {
+    "name": "DEV",
+    "score": 180,
+    "date": "Top"
+  },
+  {
+    "name": "SNK",
+    "score": 120,
+    "date": "Arcade"
+  },
+  {
+    "name": "BOB",
+    "score": 80,
+    "date": "Player"
+  }
+]

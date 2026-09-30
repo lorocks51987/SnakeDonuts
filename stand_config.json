@@ -1,0 +1,10 @@
+{
+  "camera_index": 0,
+  "largura_desejada": 1280,
+  "altura_desejada": 720,
+  "espelhar_video": true,
+  "audio_muted": false,
+  "tela_cheia": false,
+  "camera_ja_espelhada": false,
+  "game_title": "SNAKEDONUTS"
+}
