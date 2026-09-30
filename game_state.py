@@ -539,43 +539,6 @@ class SnakeGameState:
         if self.combo_multiplier > 1:
             audio.play("combo")
 
-        # Checa Progressão de Nível
-        self._check_level_progression()
-
-    def _check_level_progression(self):
-        """Verifica se o jogador atingiu os pontos necessários para o próximo nível."""
-        current_lvl = self.level
-        next_lvl = current_lvl + 1
-
-        target_score = None
-        if next_lvl in LEVEL_DEFINITIONS:
-            target_score = LEVEL_DEFINITIONS[next_lvl]["min_score"]
-        else:
-            # Níveis 6 em diante
-            target_score = 16000 + (next_lvl - 5) * 8000
-
-        if self.score >= target_score:
-            self.level = next_lvl
-            bonus = get_level_bonus(self.level)
-            self.score += bonus
-
-            lvl_info = LEVEL_DEFINITIONS.get(self.level, {
-                "nome": f"ZONA NEON {self.level}",
-                "desc": "Fantasmas mais rapidos e combos intensos!",
-                "combo_window": max(1.8, 2.2 - (self.level - 5) * 0.1),
-                "ghost_speed": min(340.0, 270.0 + (self.level - 5) * 15.0),
-                "unlocked_items": []
-            })
-
-            self.ghost_speed = lvl_info["ghost_speed"]
-            self.combo_window_max = lvl_info["combo_window"]
-            self.level_up_message = f"NIVEL {self.level}: {lvl_info['nome']}!\n{lvl_info['desc']}"
-            self.level_up_banner_timer = DURACAO_BANNER_LEVEL_UP
-            audio.play("level_up")
-            self.floating_texts.append(
-                FloatingText(f"BONUS NIVEL +{bonus}!", self.largura // 2 - 100, 100, COLOR_CYBER_GREEN, 1.2, 1.4)
-            )
-
     # -------------------------------------------------------------------------
     # LÓGICA DO CUBO SURPRESA
     # -------------------------------------------------------------------------
