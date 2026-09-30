@@ -31,7 +31,8 @@ from game_config import (
     COLOR_DARK_VOID,
     COLOR_WHITE,
     COLOR_GRAY,
-    LEVEL_DEFINITIONS
+    LEVEL_DEFINITIONS,
+    LIMIAR_SALTO_TELEPORTE
 )
 from game_state import SnakeGameState
 import stand_utils
@@ -253,7 +254,7 @@ class SnakeGameRenderer:
         for i in range(1, n_pts):
             p1 = tuple(game.points[i - 1])
             p2 = tuple(game.points[i])
-            if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) > 90.0:
+            if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) > LIMIAR_SALTO_TELEPORTE:
                 continue
             factor = i / n_pts
             thickness = int(10 + factor * 14)
@@ -272,6 +273,9 @@ class SnakeGameRenderer:
                 color = (b, g, r)
 
             cv2.line(img, p1, p2, color, thickness, cv2.LINE_AA)
+            cv2.circle(img, p2, thickness // 2, color, -1)
+            if i == 1:
+                cv2.circle(img, p1, thickness // 2, color, -1)
 
         # Cabeça com Glow Neon
         hx, hy = game.points[-1]
@@ -378,18 +382,18 @@ class SnakeGameRenderer:
     def _render_banners(self, img: np.ndarray, game: SnakeGameState, now: float):
         cx, cy = self.largura // 2, self.altura // 2
 
-        # 1. Banner de Subida de Nível (~0.85s)
+        # 1. Banner de Subida de Nível (Posicionado logo abaixo do HUD para não tapar o jogo)
         if game.level_up_banner_timer > 0.0:
-            bw, bh = 640, 110
-            bx, by = cx - bw // 2, cy - bh // 2 - 40
+            bw, bh = 580, 68
+            bx, by = cx - bw // 2, 74
             stand_utils.desenhar_retangulo_arredondado(
                 img, (bx, by), (bx + bw, by + bh),
-                cor_fundo=(12, 16, 26), cor_borda=COLOR_CYBER_GREEN, raio=14, alpha=0.94, espessura_borda=2
+                cor_fundo=(12, 16, 26), cor_borda=COLOR_CYBER_GREEN, raio=10, alpha=0.92, espessura_borda=2
             )
             linhas = game.level_up_message.split("\n")
-            cv2.putText(img, linhas[0], (bx + 30, by + 45), cv2.FONT_HERSHEY_DUPLEX, 1.0, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
+            cv2.putText(img, linhas[0], (bx + 20, by + 28), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
             if len(linhas) > 1:
-                cv2.putText(img, linhas[1], (bx + 30, by + 85), cv2.FONT_HERSHEY_DUPLEX, 0.58, COLOR_WHITE, 1, cv2.LINE_AA)
+                cv2.putText(img, linhas[1], (bx + 20, by + 54), cv2.FONT_HERSHEY_DUPLEX, 0.48, COLOR_WHITE, 1, cv2.LINE_AA)
 
         # 2. Anúncio do Efeito do Cubo Surpresa
         if game.cube_announcement_timer > 0.0 and game.active_cube_announcement:

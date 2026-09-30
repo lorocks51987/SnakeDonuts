@@ -51,6 +51,7 @@ from game_config import (
     COMPRIMENTO_INICIAL,
     CRESCIMENTO_DONUT,
     DISTANCIA_SEGURA_AUTOCOLISAO,
+    LIMIAR_SALTO_TELEPORTE,
     VELOCIDADE_GHOST_BASE,
     COLOR_CYBER_GREEN,
     COLOR_ELECTRIC_CYAN,
@@ -465,7 +466,7 @@ class SnakeGameState:
             target_score = LEVEL_DEFINITIONS[next_lvl]["min_score"]
         else:
             # Níveis 6 em diante
-            target_score = 2800 + (next_lvl - 5) * 1200
+            target_score = 10000 + (next_lvl - 5) * 6000
 
         if self.score >= target_score:
             self.level = next_lvl
@@ -476,7 +477,7 @@ class SnakeGameState:
                 "nome": f"ZONA NEON {self.level}",
                 "desc": "Fantasmas mais rapidos e combos intensos!",
                 "combo_window": max(1.8, 2.2 - (self.level - 5) * 0.1),
-                "ghost_speed": min(340.0, 280.0 + (self.level - 5) * 20.0),
+                "ghost_speed": min(340.0, 270.0 + (self.level - 5) * 15.0),
                 "unlocked_items": []
             })
 
@@ -484,10 +485,9 @@ class SnakeGameState:
             self.combo_window_max = lvl_info["combo_window"]
             self.level_up_message = f"NIVEL {self.level}: {lvl_info['nome']}!\n{lvl_info['desc']}"
             self.level_up_banner_timer = DURACAO_BANNER_LEVEL_UP
-            self.trigger_shake(0.3)
             audio.play("level_up")
             self.floating_texts.append(
-                FloatingText(f"BONUS NIVEL +{bonus}!", self.largura // 2 - 100, self.altura // 2 - 50, COLOR_CYBER_GREEN, 1.3, 1.5)
+                FloatingText(f"BONUS NIVEL +{bonus}!", self.largura // 2 - 100, 100, COLOR_CYBER_GREEN, 1.2, 1.4)
             )
 
     # -------------------------------------------------------------------------
@@ -712,11 +712,19 @@ class SnakeGameState:
             elif self.state == GameStateEnum.PAUSED_TRACKING:
                 # Retomada da mão após breve perda
                 self.state = GameStateEnum.PLAYING
-                # Reinicialização suave da cabeça sem criar segmento gigante
+                # Reinicialização suave da cabeça sem quebrar o corpo
                 rx, ry = raw_head
-                self.smooth_head = [float(rx), float(ry)]
                 if self.points:
-                    self.points[-1] = [int(rx), int(ry)]
+                    px, py = self.points[-1]
+                    d_resume = math.hypot(rx - px, ry - py)
+                    if d_resume > LIMIAR_SALTO_TELEPORTE:
+                        # Reapareceu distante: translada o corpo inteiro para a nova posição mantendo integridade
+                        dx = rx - px
+                        dy = ry - py
+                        for pt in self.points:
+                            pt[0] += int(round(dx))
+                            pt[1] += int(round(dy))
+                self.smooth_head = [float(rx), float(ry)]
         else:
             # Mão ausente: simulação de movimento pausada
             tempo_sem_mao = now - self.last_hand_seen_time
@@ -766,28 +774,36 @@ class SnakeGameState:
         # MOVIMENTAÇÃO DA CABEÇA E RASTRO DA COBRA
         # ---------------------------------------------------------------------
         rx, ry = raw_head
-        if self.smooth_head is None:
+        if self.smooth_head is None or not self.points:
             self.smooth_head = [float(rx), float(ry)]
             cx, cy = int(rx), int(ry)
-            self.points.append([cx, cy])
-            self.lengths.append(0.0)
+            self.points = [[cx, cy]]
+            self.lengths = [0.0]
+            self.current_length = 0.0
         else:
-            # Prevenção contra teletransporte e segmento gigante (> 90px de salto da mão)
-            px, py = self.points[-1] if self.points else (int(rx), int(ry))
+            px, py = self.points[-1]
             dist_raw = math.hypot(rx - px, ry - py)
 
-            if dist_raw > 90.0:
-                # Salto detectado: reancora instantaneamente no novo ponto sem arrastar cauda gigante
+            if dist_raw > LIMIAR_SALTO_TELEPORTE:
+                # Salto extremo / teletransporte detectado (ex: troca de mão): reancora no novo ponto
                 self.smooth_head = [float(rx), float(ry)]
                 cx, cy = int(rx), int(ry)
                 self.points.append([cx, cy])
                 self.lengths.append(0.0)
             else:
-                # Filtro passa-baixa ajustado por dt para movimento fluido orgânico
-                alpha_smooth = 1.0 - (0.01 ** dt)
+                # Filtro adaptativo ultra fluido e responsivo (acompanha o dedo sem lag e sem tremer)
+                d_target = math.hypot(rx - self.smooth_head[0], ry - self.smooth_head[1])
+                if d_target > 40.0:
+                    tau = 0.025  # Movimento ágil: resposta instantânea sem atraso
+                elif d_target > 10.0:
+                    tau = 0.045  # Movimento médio: transição suave e orgânica
+                else:
+                    tau = 0.090  # Mão quase parada: absorve ruído do sensor MediaPipe
+
+                alpha_smooth = 1.0 - math.exp(-dt / tau)
                 self.smooth_head[0] += (rx - self.smooth_head[0]) * alpha_smooth
                 self.smooth_head[1] += (ry - self.smooth_head[1]) * alpha_smooth
-                cx, cy = int(self.smooth_head[0]), int(self.smooth_head[1])
+                cx, cy = int(round(self.smooth_head[0])), int(round(self.smooth_head[1]))
 
                 dist = math.hypot(cx - px, cy - py)
                 if dist > 3.0:
@@ -795,8 +811,8 @@ class SnakeGameState:
                     self.lengths.append(dist)
                     self.current_length += dist
 
-        while self.current_length > self.allowed_length and len(self.lengths) > 1:
-            self.current_length -= self.lengths.pop(0)
+        while self.current_length > self.allowed_length and len(self.lengths) > 1 and len(self.points) > 1:
+            self.current_length = max(0.0, self.current_length - self.lengths.pop(1))
             self.points.pop(0)
 
         # ---------------------------------------------------------------------

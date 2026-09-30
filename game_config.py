@@ -110,6 +110,7 @@ TEMPO_OCIOSO_ATTRACT = 3.5 # segundos sem mão antes de entrar em modo apresenta
 COMPRIMENTO_INICIAL = 160
 CRESCIMENTO_DONUT = 35
 DISTANCIA_SEGURA_AUTOCOLISAO = 140.0 # distância física segura ao longo da espinha (evita colisão no próprio pescoço)
+LIMIAR_SALTO_TELEPORTE = 350.0 # distância além da qual movimento é considerado teletransporte ou troca de mão
 VELOCIDADE_GHOST_BASE = 160.0 # pixels por segundo (independente de FPS)
 
 # =============================================================================
@@ -121,39 +122,39 @@ LEVEL_DEFINITIONS = {
         "desc": "Donuts normais. Ritmo acessivel!",
         "min_score": 0,
         "combo_window": 3.0,
-        "ghost_speed": 160.0,
+        "ghost_speed": 150.0,
         "unlocked_items": []
     },
     2: {
         "nome": "CORRERIA ACUCARADA",
         "desc": "Maca e Moeda liberadas! Combos em destaque.",
-        "min_score": 400,
+        "min_score": 1200,
         "combo_window": 2.8,
-        "ghost_speed": 190.0,
+        "ghost_speed": 180.0,
         "unlocked_items": ["apple", "coin"]
     },
     3: {
         "nome": "CACA FANTASMA",
         "desc": "Pocao e Anel Dourado liberados! Fantasmas rondam.",
-        "min_score": 1000,
+        "min_score": 3000,
         "combo_window": 2.6,
-        "ghost_speed": 220.0,
+        "ghost_speed": 210.0,
         "unlocked_items": ["apple", "coin", "potion", "ring"]
     },
     4: {
         "nome": "CAIXA DE SURPRESAS",
         "desc": "Cubo Surpresa liberado! Janela de combo mais rapida.",
-        "min_score": 1800,
+        "min_score": 6000,
         "combo_window": 2.4,
-        "ghost_speed": 250.0,
+        "ghost_speed": 240.0,
         "unlocked_items": ["apple", "coin", "potion", "ring", "cube"]
     },
     5: {
         "nome": "SEGUNDA CHANCE",
         "desc": "Coracao Pixel raro liberado! Fantasmas implacaveis.",
-        "min_score": 2800,
+        "min_score": 10000,
         "combo_window": 2.2,
-        "ghost_speed": 280.0,
+        "ghost_speed": 270.0,
         "unlocked_items": ["apple", "coin", "potion", "ring", "cube", "heart"]
     }
 }

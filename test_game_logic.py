@@ -31,6 +31,7 @@ from game_config import (
     get_level_bonus,
     COMPRIMENTO_INICIAL,
     CRESCIMENTO_DONUT,
+    LEVEL_DEFINITIONS,
     get_asset_path
 )
 from leaderboard_manager import StandLeaderboard
@@ -89,6 +90,7 @@ class TestSnakeGameLogic(unittest.TestCase):
 
     # 3. EXPIRAÇÃO DE COMBO
     def test_combo_expiration(self):
+        self.game.food_pos = (50, 50)  # Isola a comida longe da cabeça
         self.game.register_eat(100, "DONUT", (500, 400), (0, 255, 0))
         self.assertGreater(self.game.combo_time_remaining, 0.0)
         # Avança tempo além da janela de combo
@@ -111,14 +113,15 @@ class TestSnakeGameLogic(unittest.TestCase):
     # 5. SUBIDA DE NÍVEL E BÔNUS
     def test_level_up_and_bonus(self):
         self.assertEqual(self.game.level, 1)
-        # Dá pontos suficientes para subir para o nível 2 (min_score: 400)
-        self.game.score = 390
+        # Dá pontos suficientes para subir para o nível 2 baseado na definição oficial
+        lvl2_target = LEVEL_DEFINITIONS[2]["min_score"]
+        self.game.score = lvl2_target - 10
         self.game.register_eat(100, "DONUT", (500, 400), (0, 255, 0))
         self.assertEqual(self.game.level, 2)
         # Bônus de nível 2 é 2 * 200 = 400
         expected_bonus = get_level_bonus(2)
         # Score final deve incluir os pontos do donut e o bônus
-        self.assertGreaterEqual(self.game.score, 390 + 100 + expected_bonus)
+        self.assertGreaterEqual(self.game.score, lvl2_target - 10 + 100 + expected_bonus)
         self.assertGreater(self.game.level_up_banner_timer, 0.0)
 
     # 6. ANEL DOURADO (ESCUDO) ABSORVE COLISÃO FATAL
@@ -473,14 +476,14 @@ class TestSnakeGameLogic(unittest.TestCase):
         self.game.points = [[100, 100]]
         self.game.lengths = [0.0]
 
-        # Salto brusco para o outro lado da tela (distância ~1000px > 90px)
+        # Salto brusco para o outro lado da tela (distância ~1000px > LIMIAR_SALTO_TELEPORTE)
         self.game.update((1000, 600), dt=0.016)
         # Cabeça deve ter reancorado imediatamente no novo ponto
         self.assertEqual(self.game.points[-1], [1000, 600])
 
         # Nos quadros seguintes, a cobra DEVE continuar se movimentando normalmente
-        for _ in range(5):
-            self.game.update((1050, 600), dt=0.08)
+        for i in range(1, 6):
+            self.game.update((1000 + i * 20, 600), dt=0.033)
 
         # Confirma que a cobra continuou sua trajetória a partir do novo ponto
         self.assertGreater(self.game.points[-1][0], 1000)
