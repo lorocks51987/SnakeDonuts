@@ -17,14 +17,15 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(SCRIPT_DIR, "assets")
 
 def get_asset_path(filename):
-    """Localiza asset na pasta assets/ ou na raiz como fallback."""
-    p_assets = os.path.join(ASSETS_DIR, filename)
-    if os.path.exists(p_assets):
-        return p_assets
+    """Localiza asset na pasta assets/ (subpastas ou raiz) ou na raiz como fallback."""
+    for sub in ["", "backgrounds", "sprites", "animations"]:
+        p = os.path.join(ASSETS_DIR, sub, filename) if sub else os.path.join(ASSETS_DIR, filename)
+        if os.path.exists(p):
+            return p
     p_root = os.path.join(SCRIPT_DIR, filename)
     if os.path.exists(p_root):
         return p_root
-    return p_assets
+    return os.path.join(ASSETS_DIR, filename)
 
 # =============================================================================
 # PALETA OFICIAL NEON ARCADE (Cores em BGR para OpenCV)
@@ -58,20 +59,25 @@ MARGEM_SPAWN_Y_TOP = 110   # Abaixo do HUD
 MARGEM_SPAWN_Y_BOTTOM = 85 # Acima da barra de status
 
 # =============================================================================
-# PONTUAÇÃO BASE
+# PONTUAÇÃO RECALIBRADA (OBJETIVOS E RECOMPENSAS)
 # =============================================================================
 SCORE_DONUT = 100
-SCORE_APPLE = 150
-SCORE_POTION = 100
-SCORE_COIN = 250
-SCORE_RING = 150
-SCORE_HEART = 200
+SCORE_GOLDEN_DONUT = 400
+SCORE_PHASE_COMPLETE = 300
+SCORE_SURVIVE_PURSUIT = 500
+SCORE_GHOST_EATEN = 800
 SCORE_SURPRISE_CUBE_BASE = 100
-SCORE_GHOST_EATEN = 500
+SCORE_RING = 50       # Proteção/utilidade, não habilidade pura
+SCORE_HEART = 50      # Proteção/utilidade, não habilidade pura
+SCORE_POTION = 50     # Proteção/utilidade, não habilidade pura
+SCORE_APPLE = 150
+SCORE_COIN = 250
+SCORE_OPTIONAL_GOAL = 500
+SCORE_JACKPOT = 1000
 
 def get_level_bonus(level: int) -> int:
-    """Bônus concedido ao subir de nível: nível * 200."""
-    return level * 200
+    """Bônus concedido ao subir de nível."""
+    return SCORE_PHASE_COMPLETE
 
 # Multiplicadores de Combo
 COMBO_TIERS = (
@@ -96,66 +102,68 @@ DURACAO_CUBE = 8.0
 DURACAO_GHOST = 7.0
 
 # Invulnerabilidades
-INVULNERABILIDADE_POS_ESCUDO = 1.0  # 1s após anel salvar
+INVULNERABILIDADE_POS_ESCUDO = 1.0     # 1s após anel salvar
 INVULNERABILIDADE_SEGUNDA_CHANCE = 2.0 # 2s após coração salvar
 
-# Temporizadores de Nível e Telas
-DURACAO_BANNER_LEVEL_UP = 2.4 # segundos para exibição do banner de nível central
+# Temporizadores de Nível e TelAS
+DURACAO_TRANSICAO_FASE = 2.0    # 2 segundos de transição entre fases
+DURACAO_BANNER_LEVEL_UP = 3.5  # segundos para exibição do banner de nível central
 TEMPO_TOLERANCIA_PERDA_MAO = 1.2 # segundos de tolerância antes de pausar
-TEMPO_OCIOSO_ATTRACT = 3.5 # segundos sem mão antes de entrar em modo apresentação
+TEMPO_OCIOSO_ATTRACT = 3.5      # segundos sem mão antes de entrar em modo apresentação
 
 # =============================================================================
 # COBRA E FÍSICA
 # =============================================================================
 COMPRIMENTO_INICIAL = 160
 CRESCIMENTO_DONUT = 35
-DISTANCIA_SEGURA_AUTOCOLISAO = 140.0 # distância física segura ao longo da espinha (evita colisão no próprio pescoço)
-LIMIAR_SALTO_TELEPORTE = 350.0 # distância além da qual movimento é considerado teletransporte ou troca de mão
-VELOCIDADE_GHOST_BASE = 160.0 # pixels por segundo (independente de FPS)
+DISTANCIA_SEGURA_AUTOCOLISAO = 140.0 # distância física segura ao longo da espinha
+LIMIAR_SALTO_TELEPORTE = 350.0       # limiar de teletransporte
+VELOCIDADE_GHOST_BASE = 160.0       # pixels por segundo
 
 # =============================================================================
-# DEFINIÇÃO DOS NÍVEIS
+# DEFINIÇÃO DAS 5 FASES COM OBJETIVOS E RECOMPENSAS PRÓPRIAS
 # =============================================================================
 LEVEL_DEFINITIONS = {
     1: {
         "nome": "AQUECIMENTO",
-        "desc": "Donuts e Anel do Sonic (Escudo)! Ritmo acessivel.",
-        "min_score": 0,
-        "combo_window": 3.0,
-        "ghost_speed": 150.0,
-        "unlocked_items": ["ring"]
+        "hud_title": "FASE 1 — AQUECIMENTO",
+        "objetivo_desc": "Coletar 5 Donuts",
+        "target_donuts": 5,
+        "combo_window": 3.5,
+        "ghost_speed": 0.0
     },
     2: {
-        "nome": "CORRERIA ACUCARADA",
-        "desc": "Caixa do Mario, Maca e Moeda liberadas! Combos a mil.",
-        "min_score": 1200,
-        "combo_window": 2.8,
-        "ghost_speed": 180.0,
-        "unlocked_items": ["ring", "cube", "apple", "coin"]
+        "nome": "COMBO RUSH",
+        "hud_title": "FASE 2 — COMBO RUSH",
+        "objetivo_desc": "Alcançar Combo x3",
+        "target_combo": 3,
+        "combo_window": 3.0,
+        "ghost_speed": 0.0
     },
     3: {
-        "nome": "CACA FANTASMA",
-        "desc": "Pocao magica liberada! Fantasmas entram na caca.",
-        "min_score": 3000,
-        "combo_window": 2.6,
-        "ghost_speed": 210.0,
-        "unlocked_items": ["ring", "cube", "apple", "coin", "potion"]
+        "nome": "CAÇA FANTASMA",
+        "hud_title": "FASE 3 — CAÇA FANTASMA",
+        "objetivo_desc": "Sobreviver 15.0s ao Fantasma",
+        "target_time": 15.0,
+        "combo_window": 2.8,
+        "ghost_speed": 170.0
     },
     4: {
-        "nome": "SEGUNDA CHANCE",
-        "desc": "Coracao Pixel raro liberado! Janela de combo rapida.",
-        "min_score": 6000,
-        "combo_window": 2.4,
-        "ghost_speed": 240.0,
-        "unlocked_items": ["ring", "cube", "apple", "coin", "potion", "heart"]
+        "nome": "CAIXA DE SURPRESAS",
+        "hud_title": "FASE 4 — SURPRESA",
+        "objetivo_desc": "Coletar 2 Cubos do Mario",
+        "target_cubes": 2,
+        "combo_window": 2.5,
+        "ghost_speed": 190.0
     },
     5: {
-        "nome": "MESTRES DO ARCADE",
-        "desc": "Velocidade maxima! Desafio supremo do stand.",
-        "min_score": 10000,
+        "nome": "REI DO ARCADE",
+        "hud_title": "FASE 5 — REI DO ARCADE",
+        "objetivo_desc": "Sobreviver 20.0s e 600 pts na fase",
+        "target_time": 20.0,
+        "target_score": 600,
         "combo_window": 2.2,
-        "ghost_speed": 270.0,
-        "unlocked_items": ["ring", "cube", "apple", "coin", "potion", "heart"]
+        "ghost_speed": 220.0
     }
 }
 

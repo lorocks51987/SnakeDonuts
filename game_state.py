@@ -117,8 +117,8 @@ class SpawnManager:
     def __init__(self, largura: int = LARGURA_PADRAO, altura: int = ALTURA_PADRAO):
         self.largura = largura
         self.altura = altura
-        self.next_special_spawn_time = time.monotonic() + 2.0
-        self.min_special_interval = 2.5 # cooldown dinamico entre spawns de itens especiais
+        self.next_special_spawn_time = time.monotonic() + 10.0 # Dá 10s para o jogador focar nos primeiros Donuts
+        self.min_special_interval = 5.0 # Cooldown arcade de 5s entre itens especiais
 
     def get_safe_position(self, avoid_points: List[Tuple[float, float]], min_dist: float = 120.0) -> Tuple[int, int]:
         """Tenta encontrar uma posição segura longe da cobra, HUD e itens."""
@@ -200,8 +200,23 @@ class SnakeGameState:
         self.combo_tight_timer: float = 0.0
         self.max_combo: int = 1
 
-        # Nível e Progressão
+        # Nível, Fases e Progressão por Objetivos
         self.level: int = 1
+        self.phase_score: int = 0
+        self.phase_donuts: int = 0
+        self.phase_cubes_collected: int = 0
+        self.phase_timer: float = 0.0
+        self.phase_event_flag1: bool = False
+        self.phase_event_flag2: bool = False
+        self.ghost_respawn_timer: float = 0.0
+        self.ghost_charge_timer: float = 0.0
+
+        # Transição de Fase Visível
+        self.in_level_transition: bool = False
+        self.transition_timer: float = 0.0
+        self.transition_data: Dict[str, Any] = {}
+        self.is_infinite_mode: bool = False
+
         self.level_up_banner_timer: float = 0.0
         self.level_up_message: str = ""
         self.unlocked_items: List[str] = []
@@ -243,7 +258,7 @@ class SnakeGameState:
     # RESET E CONTROLE DE SESSÃO
     # -------------------------------------------------------------------------
     def start_game(self):
-        """Inicia uma nova partida competitiva."""
+        """Inicia uma nova partida competitiva no nível 1."""
         self.state = GameStateEnum.PLAYING
         self.points.clear()
         self.lengths.clear()
@@ -252,10 +267,6 @@ class SnakeGameState:
         self.smooth_head = None
 
         self.score = 0
-        self.level = 1
-        self.unlocked_items.clear()
-        self.ghost_speed = LEVEL_DEFINITIONS[1]["ghost_speed"]
-        self.combo_window_max = LEVEL_DEFINITIONS[1]["combo_window"]
         self.combo_count = 0
         self.combo_multiplier = 1
         self.combo_time_remaining = 0.0
@@ -274,6 +285,8 @@ class SnakeGameState:
 
         self.ghost_active = False
         self.ghost_speed_boost_timer = 0.0
+        self.ghost_respawn_timer = 0.0
+        self.ghost_charge_timer = 0.0
 
         self.is_golden_donut = False
         self.golden_donut_timer = 0.0
@@ -290,6 +303,10 @@ class SnakeGameState:
         self.level_up_banner_timer = 0.0
         self.active_cube_announcement = None
         self.cube_announcement_timer = 0.0
+
+        self.in_level_transition = False
+        self.transition_timer = 0.0
+        self.is_infinite_mode = False
 
         self.stats = {
             "survival_time": 0.0,
@@ -308,9 +325,100 @@ class SnakeGameState:
         self.player_initials = ["A", "D", "S"]
         self.selected_initial_idx = 0
 
-        self.spawner.next_special_spawn_time = time.monotonic() + 2.0
+        self.setup_level_state(1)
         self.spawn_food()
         audio.play("start")
+
+    def setup_level_state(self, level_num: int):
+        """Inicializa parâmetros e objetivos da fase especificada."""
+        self.level = level_num
+        self.phase_score = 0
+        self.phase_event_flag1 = False
+        self.phase_event_flag2 = False
+        self.ghost_active = False
+        self.special_item_type = None
+        self.is_golden_donut = False
+        self.ghost_respawn_timer = 0.0
+        self.ghost_charge_timer = 0.0
+
+        lvl_cfg = LEVEL_DEFINITIONS.get(self.level, {})
+        self.combo_window_max = lvl_cfg.get("combo_window", 2.8)
+        self.ghost_speed = lvl_cfg.get("ghost_speed", 160.0)
+
+        if self.level == 1:
+            self.phase_donuts = 0
+            self.ghost_speed = 0.0
+            self.spawner.next_special_spawn_time = time.monotonic() + 99999.0
+        elif self.level == 2:
+            self.ghost_speed = 0.0
+            self.spawner.next_special_spawn_time = time.monotonic() + 99999.0
+        elif self.level == 3:
+            self.phase_timer = LEVEL_DEFINITIONS[3]["target_time"]
+            self.ghost_speed = LEVEL_DEFINITIONS[3]["ghost_speed"]
+            self.spawn_ghost()
+            self.spawner.next_special_spawn_time = time.monotonic() + 99999.0
+        elif self.level == 4:
+            self.phase_cubes_collected = 0
+            self.ghost_speed = LEVEL_DEFINITIONS[4]["ghost_speed"]
+            self._spawn_forced_special_item("cube")
+        elif self.level == 5:
+            self.phase_timer = LEVEL_DEFINITIONS[5]["target_time"]
+            self.ghost_speed = LEVEL_DEFINITIONS[5]["ghost_speed"]
+            self.spawn_ghost()
+            self.spawner.next_special_spawn_time = time.monotonic() + 99999.0
+        else:
+            # Modo Infinito
+            self.is_infinite_mode = True
+            self.ghost_speed = 240.0 + (self.level - 5) * 15.0
+            self.spawn_ghost()
+            self.spawner.next_special_spawn_time = time.monotonic() + 6.0
+
+    def complete_current_phase(self):
+        """Conclui a fase atual e inicia a transição visual para a próxima."""
+        bonus = SCORE_PHASE_COMPLETE
+        self.score += bonus
+        self.phase_score += bonus
+
+        current_info = LEVEL_DEFINITIONS.get(self.level, {})
+        next_level_num = self.level + 1
+        next_info = LEVEL_DEFINITIONS.get(next_level_num, {})
+
+        self.in_level_transition = True
+        self.transition_timer = DURACAO_TRANSICAO_FASE
+        self.transition_data = {
+            "completed_title": current_info.get("hud_title", f"FASE {self.level}"),
+            "phase_score": self.phase_score,
+            "next_title": next_info.get("hud_title", "MODO INFINITO"),
+            "next_objective": next_info.get("objetivo_desc", "Sobreviver ao Desafio Final")
+        }
+
+        # Limpa perigos temporários
+        self.ghost_active = False
+        self.special_item_type = None
+        self.is_golden_donut = False
+
+        audio.play("level_up")
+
+    def get_hud_objective_text(self) -> str:
+        """Retorna o texto dinâmico formatado para o HUD central."""
+        if self.is_infinite_mode:
+            return f"MODO INFINITO | PONTOS: {self.score}"
+
+        if self.level == 1:
+            if self.phase_event_flag1:
+                return "FASE 1 — AQUECIMENTO | COLETE O ANEL DO SONIC!"
+            return f"FASE 1 — AQUECIMENTO | DONUTS: {self.phase_donuts}/5"
+        elif self.level == 2:
+            if self.phase_event_flag1:
+                return "FASE 2 — COMBO RUSH | COLETE O DONUT DOURADO!"
+            return f"FASE 2 — COMBO RUSH | ALCANCE COMBO x3 (Atual: x{self.combo_multiplier})"
+        elif self.level == 3:
+            return f"FASE 3 — CAÇA FANTASMA | SOBREVIVA: {max(0.0, self.phase_timer):.1f}s"
+        elif self.level == 4:
+            return f"FASE 4 — SURPRESA | CUBOS: {self.phase_cubes_collected}/2"
+        elif self.level == 5:
+            return f"FASE 5 — REI DO ARCADE | {max(0.0, self.phase_timer):.1f}s | {self.phase_score}/600"
+        return f"FASE {self.level}"
 
     def end_game(self):
         """Finaliza a partida e avalia recordes."""
@@ -348,70 +456,49 @@ class SnakeGameState:
     def spawn_ghost(self):
         """Spawna o fantasma afastado da cobra."""
         self.ghost_active = True
-        self.ghost_timer = DURACAO_GHOST
+        self.ghost_timer = 999.0 # Mantém fantasma vivo enquanto durar a fase
         hx, hy = self.points[-1] if self.points else (self.largura // 2, self.altura // 2)
         gx = MARGEM_SPAWN_X if hx > self.largura // 2 else self.largura - MARGEM_SPAWN_X
         gy = random.randint(MARGEM_SPAWN_Y_TOP, self.altura - MARGEM_SPAWN_Y_BOTTOM)
         self.ghost_pos = [float(gx), float(gy)]
 
-    def _attempt_spawn_special_item(self, now: float):
-        """Agendador determinístico de itens especiais baseado em tempo e nível."""
-        if self.special_item_type is not None:
-            return
-        if now < self.spawner.next_special_spawn_time:
-            return
-
-        unlocked = []
-        for lvl in range(1, self.level + 1):
-            if lvl in LEVEL_DEFINITIONS:
-                unlocked.extend(LEVEL_DEFINITIONS[lvl]["unlocked_items"])
-        unlocked = list(dict.fromkeys(unlocked))
-
-        if not unlocked:
-            self.spawner.next_special_spawn_time = now + 2.0
-            return
-
-        # Pesos e probabilidades dos itens disponíveis (Alta prioridade para Anel do Sonic e Caixa do Mario)
-        pool = []
-        if "ring" in unlocked:
-            pool.extend(["ring"] * 32)
-        if "cube" in unlocked:
-            pool.extend(["cube"] * 30)
-        if "apple" in unlocked:
-            pool.extend(["apple"] * 16)
-        if "coin" in unlocked:
-            pool.extend(["coin"] * 16)
-        if "potion" in unlocked:
-            pool.extend(["potion"] * 12)
-        if "heart" in unlocked:
-            pool.extend(["heart"] * 8)
-
-        if not pool:
-            return
-
-        chosen_item = random.choice(pool)
+    def _spawn_forced_special_item(self, item_type: str):
+        """Spawna um item especial obrigatório em posição estratégica."""
         avoid = [self.food_pos]
         if self.points:
             avoid.append(self.points[-1])
         if self.ghost_active:
             avoid.append((self.ghost_pos[0], self.ghost_pos[1]))
 
-        pos = self.spawner.get_safe_position(avoid, min_dist=120.0)
-
+        pos = self.spawner.get_safe_position(avoid, min_dist=130.0)
         durations = {
-            "apple": DURACAO_MACA,
-            "potion": DURACAO_POTION,
-            "coin": DURACAO_COIN,
-            "ring": DURACAO_RING,
-            "cube": DURACAO_CUBE,
-            "heart": DURACAO_HEART
+            "apple": 12.0,
+            "potion": 10.0,
+            "coin": 8.0,
+            "ring": 999.0,
+            "cube": 999.0,
+            "heart": 12.0
         }
-
-        self.special_item_type = chosen_item
+        self.special_item_type = item_type
         self.special_item_pos = pos
-        self.special_item_timer = durations.get(chosen_item, 7.0)
+        self.special_item_timer = durations.get(item_type, 10.0)
         self.special_item_max_duration = self.special_item_timer
-        self.spawner.next_special_spawn_time = now + self.special_item_timer + self.spawner.min_special_interval
+
+    def _attempt_spawn_special_item(self, now: float):
+        """Agendador contextual de itens especiais para o modo infinito ou fases avançadas."""
+        if not self.is_infinite_mode and self.level < 4:
+            return
+        if self.special_item_type is not None:
+            return
+        if now < self.spawner.next_special_spawn_time:
+            return
+
+        pool = ["potion", "coin"]
+        if not self.has_extra_life:
+            pool.append("heart")
+        chosen_item = random.choice(pool)
+        self._spawn_forced_special_item(chosen_item)
+        self.spawner.next_special_spawn_time = now + self.special_item_timer + 8.0
 
     # -------------------------------------------------------------------------
     # COMBOS, PONTUAÇÃO E PROGRESSÃO
@@ -427,8 +514,7 @@ class SnakeGameState:
             self.max_combo = mult
 
     def register_eat(self, base_points: int, item_name: str, pos: Tuple[int, int], color: Tuple[int, int, int]):
-        """Registra pontuação com combo e atualiza estatísticas."""
-        # Se combo não estiver expirado, incrementa
+        """Registra pontuação com combo e atualiza estatísticas da fase."""
         if self.combo_time_remaining > 0.0:
             self.combo_count += 1
         else:
@@ -436,14 +522,14 @@ class SnakeGameState:
 
         self._update_combo_tier()
 
-        # Tempo da janela de combo
         janela = self.combo_window_max
         if self.combo_tight_timer > 0.0:
-            janela = 1.6 # Janela mais apertada por efeito do cubo
+            janela = 1.6
         self.combo_time_remaining = janela
 
         gained = base_points * self.combo_multiplier
         self.score += gained
+        self.phase_score += gained
         self.score_scale_anim = 1.35
 
         mult_str = f" (x{self.combo_multiplier})" if self.combo_multiplier > 1 else ""
@@ -466,7 +552,7 @@ class SnakeGameState:
             target_score = LEVEL_DEFINITIONS[next_lvl]["min_score"]
         else:
             # Níveis 6 em diante
-            target_score = 10000 + (next_lvl - 5) * 6000
+            target_score = 16000 + (next_lvl - 5) * 8000
 
         if self.score >= target_score:
             self.level = next_lvl
@@ -494,31 +580,26 @@ class SnakeGameState:
     # LÓGICA DO CUBO SURPRESA
     # -------------------------------------------------------------------------
     def apply_surprise_cube(self, pos: Tuple[int, int]):
-        """Sorteia e aplica um efeito claramente anunciado com balanceamento justo."""
-        if self.first_cube_in_game:
-            # O primeiro cubo é garantidamente positivo
-            pool = []
-            for effect, weight in CUBE_POSITIVE_WEIGHTS.items():
-                pool.extend([effect] * weight)
-            chosen = random.choice(pool)
+        """Sorteia e aplica um efeito de acordo com a fase."""
+        if self.level == 4 and self.phase_cubes_collected == 0:
+            chosen = random.choice([CubeEffect.GOLDEN_SHIELD, CubeEffect.BONUS_POINTS, CubeEffect.INVINCIBILITY])
+        elif self.level == 4 and self.phase_cubes_collected == 1:
+            chosen = random.choice([CubeEffect.FREEZE_COMBO, CubeEffect.TIGHT_COMBO, CubeEffect.BONUS_POINTS])
+        elif self.first_cube_in_game:
+            chosen = CubeEffect.GOLDEN_SHIELD
             self.first_cube_in_game = False
         else:
-            pool = []
-            for effect, weight in CUBE_POSITIVE_WEIGHTS.items():
-                pool.extend([effect] * weight)
-            for effect, weight in CUBE_RISK_WEIGHTS.items():
-                pool.extend([effect] * weight)
+            pool = list(CUBE_POSITIVE_WEIGHTS.keys()) + list(CUBE_RISK_WEIGHTS.keys())
             chosen = random.choice(pool)
 
-        # Pontuação base do cubo
         self.register_eat(SCORE_SURPRISE_CUBE_BASE, "CUBO SURPRESA", pos, COLOR_GOLDEN_GLOW)
         self.stats["special_items_collected"] += 1
         audio.play("cube")
 
-        # Aplicação dos Efeitos
         if chosen == CubeEffect.BONUS_POINTS:
             bonus = 300
             self.score += bonus
+            self.phase_score += bonus
             self.active_cube_announcement = "+300 PONTOS EXTRAS!"
             self.cube_announcement_color = COLOR_CYBER_GREEN
         elif chosen == CubeEffect.SHRINK_BODY:
@@ -637,16 +718,14 @@ class SnakeGameState:
         if self.invincible_powerup_timer > 0.0 or self.invulnerable_safety_timer > 0.0:
             return False
 
-        # Proteção essencial: a cobra não pode colidir consigo mesma antes de comer
-        # donuts suficientes para fazer uma volta de 180 graus (mínimo de 2 donuts)
-        if self.stats["donuts_eaten"] < 2 or self.current_length < 230.0:
+        # Na Fase 1 e no início de partida, evita autocolisão injusta
+        if self.level == 1 or self.stats["donuts_eaten"] < 2 or self.current_length < 230.0:
             return False
 
         if len(self.points) < 16 or self.current_length < DISTANCIA_SEGURA_AUTOCOLISAO * 1.5:
             return False
 
-        # Percorre o corpo de trás para frente (da cauda em direção à cabeça)
-        # Ignora os segmentos cuja distância acumulada até a cabeça seja < DISTANCIA_SEGURA_AUTOCOLISAO
+        # Percorre o corpo de trás para frente
         accum_dist = 0.0
         n = len(self.points)
         for i in range(n - 1, 0, -1):
@@ -655,7 +734,6 @@ class SnakeGameState:
             if accum_dist > DISTANCIA_SEGURA_AUTOCOLISAO:
                 p1 = self.points[i - 1]
                 p2 = self.points[i]
-                # Distância do ponto (hx, hy) ao segmento de reta p1-p2
                 d = self._dist_point_to_segment((hx, hy), p1, p2)
                 if d < 14.0:
                     return True

@@ -35,6 +35,11 @@ env/
 .DS_Store
 Thumbs.db
 
-# Logs e arquivos de runtime temporários
+# Logs, saídas locais de agentes e arquivos temporários
 *.log
 scratch/
+.agents/
+tests/
+test/
+*.tmp
+*.temp

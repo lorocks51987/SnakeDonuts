@@ -1,20 +1,19 @@
 # =============================================================================
-# SNAKEDONUTS - DEPENDÊNCIAS OFICIAIS
-# Visão Computacional com MediaPipe e CVZone para Stand Unimar Aberta
-# Compatível com Python 3.10 / 3.11 / 3.12 (64-bit) no Windows
+# SNAKEDONUTS - DEPENDÊNCIAS OFICIAIS (ARCADE STAND EDITION)
+# Compatível com Windows / Linux / macOS (Python 3.9 a 3.12, 64-bit)
 # =============================================================================
 
-# OpenCV (Processamento de Imagens e GUI)
-opencv-python>=4.8.0,<4.12.0
+# OpenCV (Processamento de Imagens e Janela de Apresentação)
+opencv-python>=4.8.0
 
-# Manipulação de Matrizes Numéricas (NumPy 1.x para total estabilidade com MediaPipe)
-numpy>=1.24.0,<2.0.0
+# Manipulação de Matrizes (NumPy 1.x para total compatibilidade com MediaPipe)
+numpy>=1.23.5,<2.0.0
 
-# Rastreamento de Mãos e Landmarks com IA do Google
-mediapipe>=0.10.0,<0.11.0
+# Rastreamento de Mãos e Landmarks com MediaPipe do Google
+mediapipe>=0.10.0
 
-# Módulo Utilitário de Visão Computacional e HandTracking
-cvzone>=1.6.0,<1.7.0
+# Módulo Utilitário de Visão Computacional
+cvzone>=1.5.6
 
-# Processamento de Imagens e Carregamento de Sprites/GIFs
-pillow>=10.0.0
+# Processamento de Imagens e Sprites
+pillow>=9.5.0

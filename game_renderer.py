@@ -102,17 +102,28 @@ class SnakeGameRenderer:
         self.bg_title_screen = self._load_background("title_screen_arcade_v2.png")
         self.bg_game_over = self._load_background("game_over_arcade_v2.png")
 
-        # Carregamento ÚNICO dos Sprites
+        # Carregamento ÚNICO dos Sprites Oficiais dos Power-ups
         self.sprite_donut = self._load_sprite("Donut.png", 76, fallback_color=(255, 105, 180))
         self.sprite_donut_gold = self._load_sprite("donut_dourado.png", 76, fallback_color=(0, 215, 255))
         self.sprite_potion = self._load_sprite("Potion.png", 80, fallback_color=(255, 0, 0))
         self.sprite_coin = self._load_sprite("coin.png", 82, fallback_color=(0, 215, 255))
-        self.sprite_ring = self._load_sprite("anel_dourado.png", 84, fallback_color=(0, 215, 255))
-        self.sprite_heart = self._load_sprite("coracao_pixel.png", 84, fallback_color=(50, 50, 255))
-        self.sprite_cube = self._load_sprite("cubo_surpresa.png", 84, fallback_color=(0, 215, 255))
+
+        # Power-ups Oficiais
+        # 1. Anel do Sonic (GIF Animado de 4 frames)
+        self.sonic_ring_frames = self._load_gif_frames("AnelSonic.gif", (84, 84))
+        self.sonic_ring_frame_idx = 0
+        self.last_ring_anim_time = 0.0
+        self.sprite_ring = self.sonic_ring_frames[1] if len(self.sonic_ring_frames) > 1 else self.sonic_ring_frames[0]
+
+        # 2. Coração de Segunda Chance Raro (coracao.png recortado para remover bordas transparentes)
+        self.sprite_heart = self._load_sprite_cropped("coracao.png", 80, fallback_color=(50, 50, 255))
+
+        # 3. Cubo do Mario / Caixa Misteriosa (cuboMario.png recortado)
+        self.sprite_cube = self._load_sprite_cropped("cuboMario.png", 84, fallback_color=(0, 215, 255))
 
         # Ícones do HUD (36x36)
-        self.hud_icon_shield = cv2.resize(self.sprite_ring, (36, 36)) if self.sprite_ring is not None else None
+        ring_icon_src = self.sonic_ring_frames[1] if len(self.sonic_ring_frames) > 1 else self.sprite_ring
+        self.hud_icon_shield = cv2.resize(ring_icon_src, (36, 36)) if ring_icon_src is not None else None
         self.hud_icon_heart = cv2.resize(self.sprite_heart, (36, 36)) if self.sprite_heart is not None else None
 
         # Fantasmas
@@ -136,6 +147,16 @@ class SnakeGameRenderer:
                 print(f"[RENDERER] Aviso ao carregar background {filename}: {e}")
         return None
 
+    def _create_procedural_sprite(self, size: int, fallback_color: Tuple[int, int, int]) -> np.ndarray:
+        """Fallback procedural seguro com transparência real."""
+        fb = np.zeros((size, size, 4), dtype=np.uint8)
+        cx, cy = size // 2, size // 2
+        r = size // 2 - 3
+        cv2.circle(fb, (cx, cy), r, (15, 15, 25, 240), -1, cv2.LINE_AA)
+        cv2.circle(fb, (cx, cy), r - 4, fallback_color + (255,), -1, cv2.LINE_AA)
+        cv2.circle(fb, (cx, cy), r, (0, 220, 255, 255), 2, cv2.LINE_AA)
+        return fb
+
     def _load_sprite(self, filename: str, size: int, fallback_color: Tuple[int, int, int]) -> np.ndarray:
         """Carrega sprite RGBA com redimensionamento ou cria fallback procedural original."""
         path = get_asset_path(filename)
@@ -146,15 +167,44 @@ class SnakeGameRenderer:
                     return cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
             except Exception as e:
                 print(f"[RENDERER] Aviso ao carregar sprite {filename}: {e}")
+        return self._create_procedural_sprite(size, fallback_color)
 
-        # Fallback procedural seguro com transparência real
-        fb = np.zeros((size, size, 4), dtype=np.uint8)
-        cx, cy = size // 2, size // 2
-        r = size // 2 - 3
-        cv2.circle(fb, (cx, cy), r, (15, 15, 25, 240), -1, cv2.LINE_AA)
-        cv2.circle(fb, (cx, cy), r - 4, fallback_color + (255,), -1, cv2.LINE_AA)
-        cv2.circle(fb, (cx, cy), r, (0, 220, 255, 255), 2, cv2.LINE_AA)
-        return fb
+    def _load_sprite_cropped(self, filename: str, size: int, fallback_color: Tuple[int, int, int]) -> np.ndarray:
+        """Carrega sprite RGBA, recorta bordas transparentes para centralizar e redimensiona."""
+        path = get_asset_path(filename)
+        if os.path.exists(path):
+            try:
+                img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+                if img is not None and img.size > 0:
+                    if len(img.shape) == 3 and img.shape[2] == 4:
+                        alpha = img[:, :, 3]
+                        coords = cv2.findNonZero(alpha)
+                        if coords is not None:
+                            x, y, w, h = cv2.boundingRect(coords)
+                            if w > 10 and h > 10:
+                                img = img[y:y+h, x:x+w]
+                    return cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+            except Exception as e:
+                print(f"[RENDERER] Aviso ao carregar sprite recortado {filename}: {e}")
+        return self._create_procedural_sprite(size, fallback_color)
+
+    def _load_gif_frames(self, filename: str, size: Tuple[int, int], fallback_color: Tuple[int, int, int] = (0, 215, 255)) -> List[np.ndarray]:
+        """Carrega todos os frames de um GIF animado em formato BGRA redimensionado."""
+        frames = []
+        path = get_asset_path(filename)
+        if os.path.exists(path):
+            try:
+                with Image.open(path) as gif:
+                    n_frames = getattr(gif, "n_frames", 1)
+                    for frame_idx in range(n_frames):
+                        gif.seek(frame_idx)
+                        f_rgba = gif.convert("RGBA").resize(size, Image.Resampling.LANCZOS)
+                        frames.append(cv2.cvtColor(np.array(f_rgba), cv2.COLOR_RGBA2BGRA))
+            except Exception as e:
+                print(f"[RENDERER] Aviso ao carregar frames GIF {filename}: {e}")
+        if not frames:
+            frames.append(self._create_procedural_sprite(size[0], fallback_color))
+        return frames
 
     def _load_apple_gif(self) -> List[np.ndarray]:
         """Carrega frames da maçã encantada com downsampling temporal."""
@@ -345,17 +395,27 @@ class SnakeGameRenderer:
             rc = cv2.resize(self.sprite_coin, (cw, ch))
             safe_overlay_png(img, rc, (ix - cw // 2, iy - ch // 2))
         elif item == "ring":
-            scale = 1.0 + 0.09 * math.sin(now * 7)
-            rw, rh = int(self.sprite_ring.shape[1] * scale), int(self.sprite_ring.shape[0] * scale)
-            rr = cv2.resize(self.sprite_ring, (rw, rh))
-            safe_overlay_png(img, rr, (ix - rw // 2, iy - rh // 2))
+            # Animação de rotação 3D do Anel do Sonic (avança frame a cada 90ms)
+            if now - self.last_ring_anim_time > 0.09 and len(self.sonic_ring_frames) > 0:
+                self.sonic_ring_frame_idx = (self.sonic_ring_frame_idx + 1) % len(self.sonic_ring_frames)
+                self.last_ring_anim_time = now
+            curr_frame = self.sonic_ring_frames[self.sonic_ring_frame_idx]
+            scale = 1.0 + 0.05 * math.sin(now * 6)
+            if abs(scale - 1.0) > 0.02:
+                rw, rh = int(curr_frame.shape[1] * scale), int(curr_frame.shape[0] * scale)
+                rf = cv2.resize(curr_frame, (rw, rh))
+            else:
+                rf = curr_frame
+            safe_overlay_png(img, rf, (ix - rf.shape[1] // 2, iy - rf.shape[0] // 2))
         elif item == "heart":
+            # Batimento cardíaco pulsante para o Coração de Segunda Chance Raro
             scale = 1.0 + 0.12 * abs(math.sin(now * 5))
             hw, hh = int(self.sprite_heart.shape[1] * scale), int(self.sprite_heart.shape[0] * scale)
             rh = cv2.resize(self.sprite_heart, (hw, hh))
             safe_overlay_png(img, rh, (ix - hw // 2, iy - hh // 2))
         elif item == "cube":
-            scale = 1.0 + 0.07 * math.sin(now * 6)
+            # Flutuação e bounce arcade da Caixa Misteriosa do Mario
+            scale = 1.0 + 0.06 * math.sin(now * 5)
             cw, ch = int(self.sprite_cube.shape[1] * scale), int(self.sprite_cube.shape[0] * scale)
             rc = cv2.resize(self.sprite_cube, (cw, ch))
             safe_overlay_png(img, rc, (ix - cw // 2, iy - ch // 2))
@@ -379,27 +439,49 @@ class SnakeGameRenderer:
     # -------------------------------------------------------------------------
     # BANNERS CENTRAIS DE EVENTOS
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # BANNERS CENTRAIS DE EVENTOS E TRANSIÇÕES DE FASE
+    # -------------------------------------------------------------------------
     def _render_banners(self, img: np.ndarray, game: SnakeGameState, now: float):
         cx, cy = self.largura // 2, self.altura // 2
 
-        # 1. Banner de Subida de Nível (No centro da tela, destacado e fácil de ler)
-        if game.level_up_banner_timer > 0.0:
-            bw, bh = 680, 125
-            bx, by = cx - bw // 2, cy - bh // 2 - 25
+        # 1. Overlay de Transição de Fase (FASE CONCLUÍDA + Próxima Fase)
+        if game.in_level_transition:
+            bw, bh = 760, 180
+            bx, by = cx - bw // 2, cy - bh // 2 - 20
             stand_utils.desenhar_retangulo_arredondado(
                 img, (bx, by), (bx + bw, by + bh),
-                cor_fundo=(10, 14, 26), cor_borda=COLOR_CYBER_GREEN, raio=16, alpha=0.95, espessura_borda=3
+                cor_fundo=(8, 12, 24), cor_borda=COLOR_CYBER_GREEN, raio=18, alpha=0.96, espessura_borda=3
+            )
+            cv2.putText(img, "★ FASE CONCLUÍDA! ★", (bx + 40, by + 42), cv2.FONT_HERSHEY_DUPLEX, 1.0, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA)
+
+            phase_pts = game.transition_data.get("phase_score", 0)
+            cv2.putText(img, f"Pontos Conquistados: +{phase_pts}", (bx + 40, by + 82), cv2.FONT_HERSHEY_DUPLEX, 0.68, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
+
+            next_t = game.transition_data.get("next_title", "PRÓXIMA FASE")
+            next_obj = game.transition_data.get("next_objective", "")
+            cv2.putText(img, f"Próxima: {next_t}", (bx + 40, by + 124), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_ELECTRIC_CYAN, 2, cv2.LINE_AA)
+            cv2.putText(img, f"Objetivo: {next_obj}", (bx + 40, by + 156), cv2.FONT_HERSHEY_DUPLEX, 0.58, COLOR_WHITE, 1, cv2.LINE_AA)
+            return
+
+        # 2. Banner de Subida de Nível Legado / Notificação Extra
+        if game.level_up_banner_timer > 0.0:
+            bw, bh = 700, 130
+            bx, by = cx - bw // 2, cy - bh // 2 - 25
+            alpha = 0.95
+            if game.level_up_banner_timer < 0.6:
+                alpha = max(0.15, (game.level_up_banner_timer / 0.6) * 0.95)
+            stand_utils.desenhar_retangulo_arredondado(
+                img, (bx, by), (bx + bw, by + bh),
+                cor_fundo=(10, 14, 26), cor_borda=COLOR_CYBER_GREEN, raio=16, alpha=alpha, espessura_borda=3
             )
             linhas = game.level_up_message.split("\n")
-            # Cabeçalho arcade em amarelo neon
-            cv2.putText(img, "★ SUBIU DE NIVEL! ★", (bx + 30, by + 34), cv2.FONT_HERSHEY_DUPLEX, 0.60, COLOR_GOLDEN_GLOW, 1, cv2.LINE_AA)
-            # Nome do nível em destaque verde
-            cv2.putText(img, linhas[0], (bx + 30, by + 74), cv2.FONT_HERSHEY_DUPLEX, 0.95, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
-            # Descrição do nível
+            cv2.putText(img, "★ FASE ATUALIZADA! ★", (bx + 30, by + 34), cv2.FONT_HERSHEY_DUPLEX, 0.62, COLOR_GOLDEN_GLOW, 1, cv2.LINE_AA)
+            cv2.putText(img, linhas[0], (bx + 30, by + 76), cv2.FONT_HERSHEY_DUPLEX, 0.95, COLOR_CYBER_GREEN, 2, cv2.LINE_AA)
             if len(linhas) > 1:
-                cv2.putText(img, linhas[1], (bx + 30, by + 106), cv2.FONT_HERSHEY_DUPLEX, 0.52, COLOR_WHITE, 1, cv2.LINE_AA)
+                cv2.putText(img, linhas[1], (bx + 30, by + 110), cv2.FONT_HERSHEY_DUPLEX, 0.54, COLOR_WHITE, 1, cv2.LINE_AA)
 
-        # 2. Anúncio do Efeito do Cubo Surpresa (Abaixo do centro para não colidir)
+        # 3. Anúncio do Efeito do Cubo Surpresa
         if game.cube_announcement_timer > 0.0 and game.active_cube_announcement:
             bw, bh = 560, 70
             bx, by = cx - bw // 2, cy + 90
@@ -413,40 +495,47 @@ class SnakeGameRenderer:
     # HUD SUPERIOR DO JOGO (COM ÍCONES E BARRAS DE STATUS)
     # -------------------------------------------------------------------------
     def _render_hud(self, img: np.ndarray, game: SnakeGameState, now: float):
-        hud_h = 66
+        hud_h = 76
         hud_roi = img[0:hud_h, 0:self.largura]
         hud_bg = np.full(hud_roi.shape, COLOR_DARK_VOID, dtype=np.uint8)
         cv2.addWeighted(hud_bg, 0.88, hud_roi, 0.12, 0, hud_roi)
         cv2.line(img, (0, hud_h), (self.largura, hud_h), COLOR_ELECTRIC_CYAN, 2, cv2.LINE_AA)
 
         # Logo / Título
-        cv2.putText(img, "ADS * UNIMAR ABERTA", (20, 24), cv2.FONT_HERSHEY_DUPLEX, 0.44, COLOR_ELECTRIC_CYAN, 1, cv2.LINE_AA)
+        cv2.putText(img, "ADS * UNIMAR ABERTA", (20, 24), cv2.FONT_HERSHEY_DUPLEX, 0.42, COLOR_ELECTRIC_CYAN, 1, cv2.LINE_AA)
         cv2.putText(img, "SNAKEDONUTS", (20, 52), cv2.FONT_HERSHEY_DUPLEX, 0.74, COLOR_WHITE, 2, cv2.LINE_AA)
 
-        # Pontuação Central
-        game.score_scale_anim = max(1.0, game.score_scale_anim - 0.03)
-        score_str = f"SCORE: {game.score}"
-        text_sz = cv2.getTextSize(score_str, cv2.FONT_HERSHEY_DUPLEX, 1.05 * game.score_scale_anim, 2)[0]
+        # Cabeçalho da Fase e Objetivo Central no HUD Superior
+        obj_text = game.get_hud_objective_text()
+        obj_sz = cv2.getTextSize(obj_text, cv2.FONT_HERSHEY_DUPLEX, 0.58, 2)[0]
         cv2.putText(
-            img, score_str, (self.largura // 2 - text_sz[0] // 2, 45),
-            cv2.FONT_HERSHEY_DUPLEX, 1.05 * game.score_scale_anim, COLOR_CYBER_GREEN, 2, cv2.LINE_AA
+            img, obj_text, (self.largura // 2 - obj_sz[0] // 2, 28),
+            cv2.FONT_HERSHEY_DUPLEX, 0.58, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA
         )
 
-        # Nível e Top Score no canto direito
-        high_score = max(game.score, game.leaderboard.get_high_score())
-        top_str = f"TOP: {high_score}  [NV {game.level}]"
-        cv2.putText(img, top_str, (self.largura - 320, 45), cv2.FONT_HERSHEY_DUPLEX, 0.72, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA)
+        # Pontuação Total em Destaque no HUD
+        game.score_scale_anim = max(1.0, game.score_scale_anim - 0.03)
+        score_str = f"SCORE: {game.score}"
+        text_sz = cv2.getTextSize(score_str, cv2.FONT_HERSHEY_DUPLEX, 0.85 * game.score_scale_anim, 2)[0]
+        cv2.putText(
+            img, score_str, (self.largura // 2 - text_sz[0] // 2, 62),
+            cv2.FONT_HERSHEY_DUPLEX, 0.85 * game.score_scale_anim, COLOR_CYBER_GREEN, 2, cv2.LINE_AA
+        )
 
-        # Ícones de Proteção no HUD (Escudo do Anel e Coração Pixel)
-        hud_icons_x = 240
+        # High Score e Proteções no Canto Direito
+        high_score = max(game.score, game.leaderboard.get_high_score())
+        top_str = f"TOP: {high_score}"
+        cv2.putText(img, top_str, (self.largura - 240, 30), cv2.FONT_HERSHEY_DUPLEX, 0.65, COLOR_GOLDEN_GLOW, 2, cv2.LINE_AA)
+
+        hud_icons_x = self.largura - 240
         if game.has_shield and self.hud_icon_shield is not None:
-            safe_overlay_png(img, self.hud_icon_shield, (hud_icons_x, 15))
-            cv2.putText(img, "ESCUDO", (hud_icons_x + 42, 38), cv2.FONT_HERSHEY_DUPLEX, 0.45, COLOR_GOLDEN_GLOW, 1, cv2.LINE_AA)
-            hud_icons_x += 130
+            safe_overlay_png(img, self.hud_icon_shield, (hud_icons_x, 36))
+            cv2.putText(img, "ESCUDO", (hud_icons_x + 40, 60), cv2.FONT_HERSHEY_DUPLEX, 0.44, COLOR_GOLDEN_GLOW, 1, cv2.LINE_AA)
+            hud_icons_x += 115
 
         if game.has_extra_life and self.hud_icon_heart is not None:
-            safe_overlay_png(img, self.hud_icon_heart, (hud_icons_x, 15))
-            cv2.putText(img, "VIDA +1", (hud_icons_x + 42, 38), cv2.FONT_HERSHEY_DUPLEX, 0.45, COLOR_GHOST_CRIMSON, 1, cv2.LINE_AA)
+            safe_overlay_png(img, self.hud_icon_heart, (hud_icons_x, 36))
+            cv2.putText(img, "VIDA +1", (hud_icons_x + 40, 60), cv2.FONT_HERSHEY_DUPLEX, 0.44, COLOR_GHOST_CRIMSON, 1, cv2.LINE_AA)
 
         # Barra de Combo (Abaixo do HUD)
         if game.combo_multiplier > 1 or game.combo_time_remaining > 0.0:
